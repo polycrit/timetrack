@@ -55,18 +55,60 @@ export async function GET(request: NextRequest) {
     projectMap.set(key, (projectMap.get(key) ?? 0) + e.duration);
   }
 
-  const projects = await prisma.project.findMany();
+  const projects = await prisma.project.findMany({
+    include: { parent: { select: { id: true, name: true, color: true } } },
+  });
   const projectLookup = new Map(projects.map((p) => [p.id, p]));
 
-  const projectBreakdown = Array.from(projectMap.entries()).map(
-    ([projectId, totalSeconds]) => ({
+  // Aggregate under parent projects
+  const parentAggregation = new Map<
+    string,
+    { name: string; color: string; hours: number; children: { projectName: string; color: string; hours: number }[] }
+  >();
+  let uncategorizedSeconds = 0;
+
+  for (const [projectId, totalSeconds] of projectMap.entries()) {
+    if (!projectId) {
+      uncategorizedSeconds += totalSeconds;
+      continue;
+    }
+    const project = projectLookup.get(projectId);
+    if (!project) continue;
+
+    const hours = parseFloat((totalSeconds / 3600).toFixed(1));
+    const parentId = project.parent?.id ?? project.id;
+    const parentName = project.parent?.name ?? project.name;
+    const parentColor = project.parent?.color ?? project.color;
+
+    if (!parentAggregation.has(parentId)) {
+      parentAggregation.set(parentId, { name: parentName, color: parentColor, hours: 0, children: [] });
+    }
+    const agg = parentAggregation.get(parentId)!;
+    agg.hours = parseFloat((agg.hours + hours).toFixed(1));
+    if (project.parent) {
+      agg.children.push({ projectName: project.name, color: project.color, hours });
+    }
+  }
+
+  const projectBreakdown = Array.from(parentAggregation.entries()).map(
+    ([projectId, agg]) => ({
       projectId,
-      projectName: projectId ? projectLookup.get(projectId)?.name ?? "Unknown" : "Uncategorized",
-      color: projectId ? projectLookup.get(projectId)?.color ?? "#94A3B8" : "#94A3B8",
-      totalSeconds,
-      hours: parseFloat((totalSeconds / 3600).toFixed(1)),
+      projectName: agg.name,
+      color: agg.color,
+      hours: agg.hours,
+      children: agg.children,
     })
   );
+
+  if (uncategorizedSeconds > 0) {
+    projectBreakdown.push({
+      projectId: null as unknown as string,
+      projectName: "Uncategorized",
+      color: "#94A3B8",
+      hours: parseFloat((uncategorizedSeconds / 3600).toFixed(1)),
+      children: [],
+    });
+  }
 
   // Summary stats
   const totalSeconds = entries.reduce((sum, e) => sum + e.duration, 0);

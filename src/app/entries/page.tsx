@@ -31,14 +31,24 @@ export default async function EntriesPage({
       ...(params.endDate && { lte: endOfDay(new Date(params.endDate)) }),
     };
   }
-  if (params.projectId) where.projectId = params.projectId;
+  if (params.projectId) {
+    const project = await prisma.project.findUnique({
+      where: { id: params.projectId },
+      include: { children: { select: { id: true } } },
+    });
+    if (project?.children?.length) {
+      where.projectId = { in: [project.id, ...project.children.map((c) => c.id)] };
+    } else {
+      where.projectId = params.projectId;
+    }
+  }
   if (params.tagId) where.tags = { some: { tagId: params.tagId } };
 
   const [entries, total, projects, tags] = await Promise.all([
     prisma.timeEntry.findMany({
       where,
       include: {
-        project: true,
+        project: { include: { parent: { select: { name: true } } } },
         tags: { include: { tag: true } },
       },
       orderBy: { startTime: "desc" },

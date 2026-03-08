@@ -6,7 +6,7 @@ export default async function SettingsPage() {
   const [tags, goals, projects] = await Promise.all([
     prisma.tag.findMany({ orderBy: { name: "asc" } }),
     prisma.goal.findMany({
-      include: { project: true },
+      include: { project: { include: { parent: { select: { name: true } } } } },
       orderBy: { createdAt: "desc" },
     }),
     prisma.project.findMany({ orderBy: { name: "asc" } }),

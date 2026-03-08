@@ -12,13 +12,14 @@ interface Goal {
   type: string;
   targetMinutes: number;
   projectId: string | null;
-  project: { id: string; name: string; color: string } | null;
+  project: { id: string; name: string; color: string; parent?: { name: string } | null } | null;
 }
 
 interface Project {
   id: string;
   name: string;
   color: string;
+  parentId: string | null;
 }
 
 export function GoalManager({
@@ -52,7 +53,9 @@ export function GoalManager({
                     {formatDuration(goal.targetMinutes * 60)}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {goal.project ? goal.project.name : "All projects"}
+                    {goal.project
+                      ? `${goal.project.parent ? `${goal.project.parent.name} > ` : ""}${goal.project.name}`
+                      : "All projects"}
                   </p>
                 </div>
                 <Button

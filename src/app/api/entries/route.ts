@@ -25,7 +25,17 @@ export async function GET(request: NextRequest) {
       ...(endDate && { lte: endDate }),
     };
   }
-  if (projectId) where.projectId = projectId;
+  if (projectId) {
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      include: { children: { select: { id: true } } },
+    });
+    if (project?.children?.length) {
+      where.projectId = { in: [project.id, ...project.children.map((c: { id: string }) => c.id)] };
+    } else {
+      where.projectId = projectId;
+    }
+  }
   if (tagId) where.tags = { some: { tagId } };
 
   const [entries, total] = await Promise.all([

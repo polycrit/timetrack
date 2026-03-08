@@ -10,11 +10,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ProjectSelect } from "@/components/projects/project-select";
 
 interface Project {
   id: string;
   name: string;
   color: string;
+  parentId: string | null;
 }
 
 interface Tag {
@@ -69,22 +71,15 @@ export function EntryFilters({
       </div>
       <div className="space-y-1 w-full sm:w-auto">
         <label className="text-sm text-muted-foreground">Project</label>
-        <Select
+        <ProjectSelect
+          projects={projects}
           value={searchParams.get("projectId") ?? "all"}
           onValueChange={(v) => updateFilter("projectId", v)}
-        >
-          <SelectTrigger className="w-full sm:w-[160px]">
-            <SelectValue placeholder="All projects" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All projects</SelectItem>
-            {projects.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          showAll
+          includeParents
+          placeholder="All projects"
+          className="w-full sm:w-[160px]"
+        />
       </div>
       {tags.length > 0 && (
         <div className="space-y-1 w-full sm:w-auto">

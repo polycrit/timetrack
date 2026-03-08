@@ -18,6 +18,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { ProjectSelect } from "@/components/projects/project-select";
 import { createGoal } from "@/actions/goals";
 import { Plus } from "lucide-react";
 
@@ -25,6 +26,7 @@ interface Project {
   id: string;
   name: string;
   color: string;
+  parentId: string | null;
 }
 
 export function GoalForm({ projects }: { projects: Project[] }) {
@@ -34,7 +36,7 @@ export function GoalForm({ projects }: { projects: Project[] }) {
 
   async function handleSubmit(formData: FormData) {
     formData.set("type", type);
-    formData.set("projectId", projectId === "overall" ? "" : projectId);
+    formData.set("projectId", projectId);
 
     // Convert hours to minutes
     const hours = parseFloat(formData.get("hours") as string) || 0;
@@ -84,19 +86,14 @@ export function GoalForm({ projects }: { projects: Project[] }) {
           </div>
           <div className="space-y-2">
             <Label>Scope</Label>
-            <Select value={projectId || "overall"} onValueChange={setProjectId}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="overall">Overall (all projects)</SelectItem>
-                {projects.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <ProjectSelect
+              projects={projects}
+              value={projectId || "all"}
+              onValueChange={(v) => setProjectId(v === "all" ? "" : v)}
+              includeParents
+              showAll
+              placeholder="Overall (all projects)"
+            />
           </div>
           <Button type="submit" className="w-full">
             Create Goal

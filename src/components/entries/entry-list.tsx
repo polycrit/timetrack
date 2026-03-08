@@ -15,7 +15,7 @@ interface TimeEntry {
   endTime: string;
   duration: number;
   projectId: string | null;
-  project: { id: string; name: string; color: string } | null;
+  project: { id: string; name: string; color: string; parent?: { name: string } | null } | null;
   tags: { tagId: string; tag: { id: string; name: string } }[];
 }
 
@@ -23,6 +23,7 @@ interface Project {
   id: string;
   name: string;
   color: string;
+  parentId: string | null;
 }
 
 interface Tag {
@@ -81,6 +82,7 @@ export function EntryList({ entries, projects, tags }: EntryListProps) {
                       borderColor: entry.project.color + "40",
                     }}
                   >
+                    {entry.project.parent ? `${entry.project.parent.name} > ` : ""}
                     {entry.project.name}
                   </Badge>
                 )}

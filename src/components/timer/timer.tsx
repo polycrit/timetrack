@@ -11,13 +11,7 @@ import { ProgressRing } from "./progress-ring";
 import { PomodoroSettingsDialog } from "./pomodoro-settings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { ProjectSelect } from "@/components/projects/project-select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Play, Pause, Square, SkipForward, RotateCcw } from "lucide-react";
@@ -37,6 +31,7 @@ interface Project {
   id: string;
   name: string;
   color: string;
+  parentId: string | null;
 }
 
 export function Timer({ projects: initialProjects }: { projects: Project[] }) {
@@ -382,7 +377,8 @@ export function Timer({ projects: initialProjects }: { projects: Project[] }) {
               }}
               className="flex-1"
             />
-            <Select
+            <ProjectSelect
+              projects={projects}
               value={
                 isCountdownMode
                   ? countdown.isRunning ? (countdown.projectId ?? "") : countdownProjectId
@@ -404,25 +400,9 @@ export function Timer({ projects: initialProjects }: { projects: Project[] }) {
                   }
                 }
               }}
-            >
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Project" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No project</SelectItem>
-                {projects.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    <span className="flex items-center gap-2">
-                      <span
-                        className="inline-block h-3 w-3 rounded-sm"
-                        style={{ backgroundColor: p.color }}
-                      />
-                      {p.name}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              showNone
+              className="w-full sm:w-[180px]"
+            />
           </div>
         )}
       </CardContent>

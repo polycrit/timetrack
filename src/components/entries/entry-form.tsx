@@ -6,13 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { ProjectSelect } from "@/components/projects/project-select";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +20,7 @@ interface Project {
   id: string;
   name: string;
   color: string;
+  parentId: string | null;
 }
 
 interface Tag {
@@ -145,25 +140,13 @@ export function EntryForm({ projects, tags, entry, trigger }: EntryFormProps) {
           </div>
           <div className="space-y-2">
             <Label>Project</Label>
-            <Select value={projectId} onValueChange={(v) => setProjectId(v === "none" ? "" : v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="No project" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No project</SelectItem>
-                {projects.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    <span className="flex items-center gap-2">
-                      <span
-                        className="inline-block h-3 w-3 rounded-full"
-                        style={{ backgroundColor: p.color }}
-                      />
-                      {p.name}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <ProjectSelect
+              projects={projects}
+              value={projectId}
+              onValueChange={(v) => setProjectId(v === "none" ? "" : v)}
+              showNone
+              placeholder="No project"
+            />
           </div>
           {tags.length > 0 && (
             <div className="space-y-2">

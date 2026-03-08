@@ -14,11 +14,11 @@ export default async function DashboardPage() {
   const [todayEntries, goals, streakData, projects] = await Promise.all([
     prisma.timeEntry.findMany({
       where: { startTime: { gte: start, lte: end } },
-      include: { project: true },
+      include: { project: { include: { parent: { select: { name: true } } } } },
       orderBy: { startTime: "desc" },
       take: 5,
     }),
-    prisma.goal.findMany({ include: { project: true } }),
+    prisma.goal.findMany({ include: { project: { include: { parent: { select: { name: true } } } } } }),
     getStreakData(),
     prisma.project.findMany({ orderBy: { name: "asc" } }),
   ]);
@@ -86,6 +86,7 @@ export default async function DashboardPage() {
                           color: entry.project.color,
                         }}
                       >
+                        {entry.project.parent ? `${entry.project.parent.name} > ` : ""}
                         {entry.project.name}
                       </Badge>
                     )}

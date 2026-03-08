@@ -9,7 +9,7 @@ interface Goal {
   type: string;
   targetMinutes: number;
   projectId: string | null;
-  project: { id: string; name: string; color: string } | null;
+  project: { id: string; name: string; color: string; parent?: { name: string } | null } | null;
 }
 
 async function getGoalProgress(goal: Goal) {
@@ -17,7 +17,18 @@ async function getGoalProgress(goal: Goal) {
   const where: Record<string, unknown> = {
     startTime: { gte: range.start, lte: range.end },
   };
-  if (goal.projectId) where.projectId = goal.projectId;
+
+  if (goal.projectId) {
+    const children = await prisma.project.findMany({
+      where: { parentId: goal.projectId },
+      select: { id: true },
+    });
+    if (children.length > 0) {
+      where.projectId = { in: [goal.projectId, ...children.map((c) => c.id)] };
+    } else {
+      where.projectId = goal.projectId;
+    }
+  }
 
   const result = await prisma.timeEntry.aggregate({
     where,
@@ -58,7 +69,9 @@ export async function GoalProgress({ goals }: { goals: Goal[] }) {
               <div className="flex justify-between text-sm">
                 <span className="font-medium">
                   {goal.type === "daily" ? "Daily" : "Weekly"}
-                  {goal.project ? ` - ${goal.project.name}` : ""}
+                  {goal.project
+                    ? ` - ${goal.project.parent ? `${goal.project.parent.name} > ` : ""}${goal.project.name}`
+                    : ""}
                 </span>
                 <span className="font-mono text-xs text-muted-foreground">
                   {formatDuration(goal.current)} / {formatDuration(targetSeconds)}

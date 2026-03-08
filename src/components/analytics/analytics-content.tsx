@@ -12,7 +12,7 @@ import { AnalyticsSkeleton } from "@/components/ui/skeleton-cards";
 
 interface AnalyticsData {
   dailyBreakdown: { date: string; hours: number }[];
-  projectBreakdown: { projectName: string; color: string; hours: number }[];
+  projectBreakdown: { projectName: string; color: string; hours: number; children?: { projectName: string; color: string; hours: number }[] }[];
   summary: {
     totalHours: number;
     avgHoursPerDay: number;
