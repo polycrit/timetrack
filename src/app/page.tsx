@@ -1,65 +1,109 @@
-import Image from "next/image";
+import { prisma } from "@/lib/prisma";
+import { Timer } from "@/components/timer/timer";
+import { GoalProgress } from "@/components/goals/goal-progress";
+import { StreakDisplay } from "@/components/streak/streak-display";
+import { getStreakData } from "@/actions/daily-log";
+import { getTodayRange, formatDuration, formatTime } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Clock } from "lucide-react";
 
-export default function Home() {
+export default async function DashboardPage() {
+  const { start, end } = getTodayRange();
+
+  const [todayEntries, goals, streakData, projects] = await Promise.all([
+    prisma.timeEntry.findMany({
+      where: { startTime: { gte: start, lte: end } },
+      include: { project: true },
+      orderBy: { startTime: "desc" },
+      take: 5,
+    }),
+    prisma.goal.findMany({ include: { project: true } }),
+    getStreakData(),
+    prisma.project.findMany({ orderBy: { name: "asc" } }),
+  ]);
+
+  const todayTotal = todayEntries.reduce((sum, e) => sum + e.duration, 0);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="space-y-6">
+      <h1 className="font-pixel text-base md:text-lg tracking-tight text-accent">Dashboard</h1>
+
+      {/* Timer */}
+      <Timer projects={projects} />
+
+      {/* Stats Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Today's Summary */}
+        <Card className="retro-bevel card-hover animate-card-appear">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Clock className="h-4 w-4 text-primary" />
+              Today
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="font-pixel text-xl text-primary">{formatDuration(todayTotal)}</p>
+            <p className="text-sm text-muted-foreground">
+              {todayEntries.length} {todayEntries.length === 1 ? "entry" : "entries"}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Streak */}
+        <StreakDisplay
+          currentStreak={streakData.currentStreak}
+          bestStreak={streakData.bestStreak}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+
+        {/* Goals */}
+        <GoalProgress goals={goals} />
+      </div>
+
+      {/* Recent Entries */}
+      {todayEntries.length > 0 && (
+        <Card className="retro-bevel card-hover animate-card-appear">
+          <CardHeader>
+            <CardTitle className="text-base">Recent Entries</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {todayEntries.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="truncate text-sm">
+                      {entry.description || "Untitled"}
+                    </span>
+                    {entry.project && (
+                      <Badge
+                        variant="secondary"
+                        className="shrink-0"
+                        style={{
+                          backgroundColor: entry.project.color + "20",
+                          color: entry.project.color,
+                        }}
+                      >
+                        {entry.project.name}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 ml-2 shrink-0">
+                    <span className="text-sm text-muted-foreground">
+                      {formatTime(entry.startTime)} - {formatTime(entry.endTime)}
+                    </span>
+                    <span className="font-mono text-sm font-medium">
+                      {formatDuration(entry.duration)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
