@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Timer, List, FolderKanban, BarChart3, Settings, Menu, X } from "lucide-react";
+import { signOut } from "next-auth/react";
+import { Timer, List, FolderKanban, BarChart3, Settings, Menu, X, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -16,7 +17,13 @@ const navItems = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-function NavContent({ onNavigate }: { onNavigate?: () => void }) {
+interface SidebarUser {
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+}
+
+function NavContent({ user, onNavigate }: { user: SidebarUser | null; onNavigate?: () => void }) {
   const pathname = usePathname();
 
   return (
@@ -59,6 +66,34 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
       {/* Bottom */}
       <div className="mt-auto px-3 pb-2">
         <div className="chrome-divider" />
+        {user && (
+          <div className="mt-3 flex items-center gap-2">
+            {user.image ? (
+              <img src={user.image} alt="" className="h-7 w-7 rounded-full" />
+            ) : (
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-sidebar-primary/20 text-xs font-semibold text-sidebar-primary">
+                {(user.name?.[0] ?? user.email?.[0] ?? "?").toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-sidebar-foreground">
+                {user.name ?? "User"}
+              </p>
+              <p className="truncate text-[10px] text-sidebar-foreground/50">
+                {user.email}
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              aria-label="Sign out"
+              className="shrink-0 text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
         <div className="mt-2 flex items-center justify-between">
           <p className="font-pixel text-[6px] text-muted-foreground/50">v1.0</p>
           <ThemeToggle />
@@ -68,7 +103,7 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-export function Sidebar() {
+export function Sidebar({ user }: { user: SidebarUser | null }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -108,14 +143,14 @@ export function Sidebar() {
                 <X className="h-5 w-5" />
               </Button>
             </div>
-            <NavContent onNavigate={() => setMobileOpen(false)} />
+            <NavContent user={user} onNavigate={() => setMobileOpen(false)} />
           </aside>
         </div>
       )}
 
       {/* Desktop sidebar */}
       <aside className="hidden md:flex h-screen w-64 flex-col border-r border-sidebar-border bg-sidebar p-4">
-        <NavContent />
+        <NavContent user={user} />
       </aside>
     </>
   );

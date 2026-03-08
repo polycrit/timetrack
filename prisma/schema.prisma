@@ -7,26 +7,93 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── Auth.js Models ─────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts    Account[]
+  sessions    Session[]
+  projects    Project[]
+  tags        Tag[]
+  timeEntries TimeEntry[]
+  goals       Goal[]
+  dailyLogs   DailyLog[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Application Models ─────────────────────────────────────────
+
 model Project {
   id          String      @id @default(cuid())
   name        String
   color       String
   parentId    String?
+  userId      String
   parent      Project?    @relation("ProjectHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
   children    Project[]   @relation("ProjectHierarchy")
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   timeEntries TimeEntry[]
   goals       Goal[]
 
   @@index([parentId])
+  @@index([userId])
 }
 
 model Tag {
   id        String         @id @default(cuid())
-  name      String         @unique
+  name      String
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime       @default(now())
   entries   TimeEntryTag[]
+
+  @@unique([name, userId])
+  @@index([userId])
 }
 
 model TimeEntry {
@@ -36,13 +103,16 @@ model TimeEntry {
   endTime     DateTime
   duration    Int
   projectId   String?
+  userId      String
   project     Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   tags        TimeEntryTag[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
   @@index([startTime])
   @@index([projectId])
+  @@index([userId])
 }
 
 model TimeEntryTag {
@@ -59,20 +129,27 @@ model Goal {
   type          String
   targetMinutes Int
   projectId     String?
+  userId        String
   project       Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  @@unique([type, projectId])
+  @@unique([type, projectId, userId])
+  @@index([userId])
 }
 
 model DailyLog {
   id           String   @id @default(cuid())
-  date         DateTime @unique @db.Date
+  date         DateTime @db.Date
   totalSeconds Int      @default(0)
   streakDay    Boolean  @default(false)
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  @@unique([date, userId])
   @@index([date])
+  @@index([userId])
 }

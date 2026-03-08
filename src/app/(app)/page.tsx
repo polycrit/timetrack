@@ -7,20 +7,22 @@ import { getTodayRange, formatDuration, formatTime } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock } from "lucide-react";
+import { getRequiredUser } from "@/lib/auth-utils";
 
 export default async function DashboardPage() {
+  const userId = await getRequiredUser();
   const { start, end } = getTodayRange();
 
   const [todayEntries, goals, streakData, projects] = await Promise.all([
     prisma.timeEntry.findMany({
-      where: { startTime: { gte: start, lte: end } },
+      where: { userId, startTime: { gte: start, lte: end } },
       include: { project: { include: { parent: { select: { name: true } } } } },
       orderBy: { startTime: "desc" },
       take: 5,
     }),
-    prisma.goal.findMany({ include: { project: { include: { parent: { select: { name: true } } } } } }),
-    getStreakData(),
-    prisma.project.findMany({ orderBy: { name: "asc" } }),
+    prisma.goal.findMany({ where: { userId }, include: { project: { include: { parent: { select: { name: true } } } } } }),
+    getStreakData(userId),
+    prisma.project.findMany({ where: { userId }, orderBy: { name: "asc" } }),
   ]);
 
   const todayTotal = todayEntries.reduce((sum, e) => sum + e.duration, 0);

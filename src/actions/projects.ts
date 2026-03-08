@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { createProjectSchema } from "@/lib/validators";
+import { getRequiredUser } from "@/lib/auth-utils";
 
 export async function createProject(formData: FormData) {
+  const userId = await getRequiredUser();
   const raw = {
     name: formData.get("name") as string,
     color: formData.get("color") as string,
@@ -18,9 +20,10 @@ export async function createProject(formData: FormData) {
   if (parsed.data.parentId) {
     const parent = await prisma.project.findUnique({
       where: { id: parsed.data.parentId },
-      select: { parentId: true },
+      select: { parentId: true, userId: true },
     });
-    if (!parent) return { error: { parentId: ["Parent project not found"] } };
+    if (!parent || parent.userId !== userId)
+      return { error: { parentId: ["Parent project not found"] } };
     if (parent.parentId)
       return { error: { parentId: ["Cannot nest more than one level deep"] } };
   }
@@ -30,6 +33,7 @@ export async function createProject(formData: FormData) {
       name: parsed.data.name,
       color: parsed.data.color,
       parentId: parsed.data.parentId ?? null,
+      userId,
     },
   });
   revalidatePath("/projects");
@@ -37,6 +41,7 @@ export async function createProject(formData: FormData) {
 }
 
 export async function updateProject(id: string, formData: FormData) {
+  const userId = await getRequiredUser();
   const raw = {
     name: formData.get("name") as string,
     color: formData.get("color") as string,
@@ -53,15 +58,16 @@ export async function updateProject(id: string, formData: FormData) {
     }
     const parent = await prisma.project.findUnique({
       where: { id: parsed.data.parentId },
-      select: { parentId: true },
+      select: { parentId: true, userId: true },
     });
-    if (!parent) return { error: { parentId: ["Parent project not found"] } };
+    if (!parent || parent.userId !== userId)
+      return { error: { parentId: ["Parent project not found"] } };
     if (parent.parentId)
       return { error: { parentId: ["Cannot nest more than one level deep"] } };
   }
 
-  await prisma.project.update({
-    where: { id },
+  await prisma.project.updateMany({
+    where: { id, userId },
     data: {
       name: parsed.data.name,
       color: parsed.data.color,
@@ -73,7 +79,8 @@ export async function updateProject(id: string, formData: FormData) {
 }
 
 export async function deleteProject(id: string) {
-  await prisma.project.delete({ where: { id } });
+  const userId = await getRequiredUser();
+  await prisma.project.deleteMany({ where: { id, userId } });
   revalidatePath("/projects");
   revalidatePath("/");
 }

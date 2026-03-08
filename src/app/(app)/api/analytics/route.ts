@@ -10,8 +10,13 @@ import {
   eachDayOfInterval,
   getDay,
 } from "date-fns";
+import { getRequiredUserApi } from "@/lib/auth-utils";
 
 export async function GET(request: NextRequest) {
+  const userIdOrRes = await getRequiredUserApi();
+  if (userIdOrRes instanceof NextResponse) return userIdOrRes;
+  const userId = userIdOrRes;
+
   const { searchParams } = new URL(request.url);
   const period = searchParams.get("period") ?? "weekly";
 
@@ -28,7 +33,7 @@ export async function GET(request: NextRequest) {
 
   // Daily breakdown from DailyLog
   const dailyLogs = await prisma.dailyLog.findMany({
-    where: { date: { gte: rangeStart, lte: rangeEnd } },
+    where: { userId, date: { gte: rangeStart, lte: rangeEnd } },
     orderBy: { date: "asc" },
   });
 
@@ -45,7 +50,7 @@ export async function GET(request: NextRequest) {
 
   // Project breakdown
   const entries = await prisma.timeEntry.findMany({
-    where: { startTime: { gte: rangeStart, lte: rangeEnd } },
+    where: { userId, startTime: { gte: rangeStart, lte: rangeEnd } },
     select: { duration: true, projectId: true },
   });
 
@@ -56,6 +61,7 @@ export async function GET(request: NextRequest) {
   }
 
   const projects = await prisma.project.findMany({
+    where: { userId },
     include: { parent: { select: { id: true, name: true, color: true } } },
   });
   const projectLookup = new Map(projects.map((p) => [p.id, p]));

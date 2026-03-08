@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { createGoalSchema } from "@/lib/validators";
+import { getRequiredUser } from "@/lib/auth-utils";
 
 export async function createGoal(formData: FormData) {
+  const userId = await getRequiredUser();
   const raw = {
     type: formData.get("type") as string,
     targetMinutes: parseInt(formData.get("targetMinutes") as string, 10),
@@ -19,6 +21,7 @@ export async function createGoal(formData: FormData) {
       type: parsed.data.type,
       targetMinutes: parsed.data.targetMinutes,
       projectId: parsed.data.projectId || null,
+      userId,
     },
   });
   revalidatePath("/settings");
@@ -26,7 +29,8 @@ export async function createGoal(formData: FormData) {
 }
 
 export async function deleteGoal(id: string) {
-  await prisma.goal.delete({ where: { id } });
+  const userId = await getRequiredUser();
+  await prisma.goal.deleteMany({ where: { id, userId } });
   revalidatePath("/settings");
   revalidatePath("/");
 }

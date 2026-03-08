@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createProjectSchema } from "@/lib/validators";
+import { getRequiredUserApi } from "@/lib/auth-utils";
 
 export async function GET(request: NextRequest) {
+  const userIdOrRes = await getRequiredUserApi();
+  if (userIdOrRes instanceof NextResponse) return userIdOrRes;
+  const userId = userIdOrRes;
+
   const { searchParams } = new URL(request.url);
   const flat = searchParams.get("flat") === "true";
 
   if (flat) {
     const projects = await prisma.project.findMany({
+      where: { userId },
       orderBy: { name: "asc" },
       include: { parent: { select: { id: true, name: true, color: true } } },
     });
@@ -15,7 +21,7 @@ export async function GET(request: NextRequest) {
   }
 
   const projects = await prisma.project.findMany({
-    where: { parentId: null },
+    where: { parentId: null, userId },
     include: {
       children: { orderBy: { name: "asc" } },
     },
@@ -25,6 +31,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const userIdOrRes = await getRequiredUserApi();
+  if (userIdOrRes instanceof NextResponse) return userIdOrRes;
+  const userId = userIdOrRes;
+
   const body = await request.json();
   const parsed = createProjectSchema.safeParse(body);
   if (!parsed.success) {
@@ -37,9 +47,9 @@ export async function POST(request: NextRequest) {
   if (parsed.data.parentId) {
     const parent = await prisma.project.findUnique({
       where: { id: parsed.data.parentId },
-      select: { parentId: true },
+      select: { parentId: true, userId: true },
     });
-    if (!parent) {
+    if (!parent || parent.userId !== userId) {
       return NextResponse.json(
         { error: { parentId: ["Parent project not found"] } },
         { status: 400 }
@@ -58,6 +68,7 @@ export async function POST(request: NextRequest) {
       name: parsed.data.name,
       color: parsed.data.color,
       parentId: parsed.data.parentId ?? null,
+      userId,
     },
   });
   return NextResponse.json(project, { status: 201 });

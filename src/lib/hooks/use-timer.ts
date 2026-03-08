@@ -140,6 +140,7 @@ export function useTimer(pomodoroSettings?: PomodoroSettings) {
         pausedDuration: 0,
         pauseStart: null,
       };
+      setElapsedSeconds(0);
       setState(newState);
       saveState(newState);
     } else {
@@ -162,6 +163,7 @@ export function useTimer(pomodoroSettings?: PomodoroSettings) {
         pausedDuration: 0,
         pauseStart: null,
       };
+      setElapsedSeconds(0);
       setState(newState);
       saveState(newState);
     }
@@ -353,17 +355,17 @@ export function useTimer(pomodoroSettings?: PomodoroSettings) {
   const setMode = useCallback((mode: TimerMode) => {
     if (state.isRunning) return; // Can't switch modes while running
     const newState: TimerState = {
-      ...DEFAULT_STATE,
+      ...state,
       mode,
-      pomodoroPhase: "work",
-      pomodoroCount: 0,
-      pomodoroTargetSeconds: pomodoroSettings
-        ? pomodoroSettings.workMinutes * 60
-        : 25 * 60,
+      isRunning: false,
+      isPaused: false,
+      startTime: null,
+      pausedDuration: 0,
+      pauseStart: null,
     };
     setState(newState);
     saveState(newState);
-  }, [state.isRunning, pomodoroSettings]);
+  }, [state]);
 
   const skipPhase = useCallback(() => {
     if (state.mode !== "pomodoro" || !state.isRunning) return;
@@ -393,6 +395,7 @@ export function useTimer(pomodoroSettings?: PomodoroSettings) {
         pauseStart: null,
         isPaused: false,
       };
+      setElapsedSeconds(0);
       setState(newState);
       saveState(newState);
     } else {
@@ -410,6 +413,7 @@ export function useTimer(pomodoroSettings?: PomodoroSettings) {
         pauseStart: null,
         isPaused: false,
       };
+      setElapsedSeconds(0);
       setState(newState);
       saveState(newState);
     }

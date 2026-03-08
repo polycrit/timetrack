@@ -6,6 +6,7 @@ import { EntryForm } from "@/components/entries/entry-form";
 import { FilterSkeleton } from "@/components/ui/skeleton-cards";
 import { endOfDay, startOfDay } from "date-fns";
 import Link from "next/link";
+import { getRequiredUser } from "@/lib/auth-utils";
 
 interface SearchParams {
   startDate?: string;
@@ -20,11 +21,12 @@ export default async function EntriesPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  const userId = await getRequiredUser();
   const params = await searchParams;
   const page = parseInt(params.page ?? "1", 10);
   const pageSize = 20;
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = { userId };
   if (params.startDate || params.endDate) {
     where.startTime = {
       ...(params.startDate && { gte: startOfDay(new Date(params.startDate)) }),
@@ -56,8 +58,8 @@ export default async function EntriesPage({
       take: pageSize,
     }),
     prisma.timeEntry.count({ where }),
-    prisma.project.findMany({ orderBy: { name: "asc" } }),
-    prisma.tag.findMany({ orderBy: { name: "asc" } }),
+    prisma.project.findMany({ where: { userId }, orderBy: { name: "asc" } }),
+    prisma.tag.findMany({ where: { userId }, orderBy: { name: "asc" } }),
   ]);
 
   const totalPages = Math.ceil(total / pageSize);

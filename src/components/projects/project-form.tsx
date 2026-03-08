@@ -32,11 +32,12 @@ interface ProjectFormProps {
   trigger?: React.ReactNode;
   parentProjects?: { id: string; name: string; color: string }[];
   defaultParentId?: string;
+  defaultParentColor?: string;
 }
 
-export function ProjectForm({ project, trigger, parentProjects, defaultParentId }: ProjectFormProps) {
+export function ProjectForm({ project, trigger, parentProjects, defaultParentId, defaultParentColor }: ProjectFormProps) {
   const [open, setOpen] = useState(false);
-  const [color, setColor] = useState(project?.color ?? PRESET_COLORS[0]);
+  const [color, setColor] = useState(project?.color ?? defaultParentColor ?? PRESET_COLORS[0]);
   const [parentId, setParentId] = useState(
     project?.parentId ?? defaultParentId ?? ""
   );

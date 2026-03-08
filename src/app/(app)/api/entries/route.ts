@@ -3,8 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { createTimeEntrySchema, entryFilterSchema } from "@/lib/validators";
 import { calculateDuration } from "@/lib/utils";
 import { recalculateDailyLog } from "@/actions/daily-log";
+import { getRequiredUserApi } from "@/lib/auth-utils";
 
 export async function GET(request: NextRequest) {
+  const userIdOrRes = await getRequiredUserApi();
+  if (userIdOrRes instanceof NextResponse) return userIdOrRes;
+  const userId = userIdOrRes;
+
   const { searchParams } = new URL(request.url);
   const params = Object.fromEntries(searchParams.entries());
   const parsed = entryFilterSchema.safeParse(params);
@@ -18,7 +23,7 @@ export async function GET(request: NextRequest) {
 
   const { startDate, endDate, projectId, tagId, page, pageSize } = parsed.data;
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = { userId };
   if (startDate || endDate) {
     where.startTime = {
       ...(startDate && { gte: startDate }),
@@ -62,6 +67,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const userIdOrRes = await getRequiredUserApi();
+  if (userIdOrRes instanceof NextResponse) return userIdOrRes;
+  const userId = userIdOrRes;
+
   const body = await request.json();
   const parsed = createTimeEntrySchema.safeParse(body);
 
@@ -81,6 +90,7 @@ export async function POST(request: NextRequest) {
       endTime: parsed.data.endTime,
       duration,
       projectId: parsed.data.projectId || null,
+      userId,
       tags: {
         create: (parsed.data.tagIds ?? []).map((tagId) => ({ tagId })),
       },
@@ -91,8 +101,7 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  // Update daily log
-  await recalculateDailyLog(parsed.data.startTime);
+  await recalculateDailyLog(parsed.data.startTime, userId);
 
   return NextResponse.json(entry, { status: 201 });
 }
