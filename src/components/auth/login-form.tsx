@@ -2,16 +2,15 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { login } from "@/actions/auth";
 
 export function LoginForm() {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   async function handleCredentials(e: React.FormEvent<HTMLFormElement>) {
@@ -19,25 +18,11 @@ export function LoginForm() {
     setLoading(true);
     const formData = new FormData(e.currentTarget);
 
-    try {
-      const result = await signIn("credentials", {
-        email: formData.get("email") as string,
-        password: formData.get("password") as string,
-        redirect: false,
-      });
+    const result = await login(formData);
+    setLoading(false);
 
-      setLoading(false);
-
-      if (!result?.ok) {
-        toast.error("Invalid email or password");
-        return;
-      }
-
-      router.push("/");
-      router.refresh();
-    } catch {
-      setLoading(false);
-      toast.error("Invalid email or password");
+    if (result?.error) {
+      toast.error(result.error);
     }
   }
 
