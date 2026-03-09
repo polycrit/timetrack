@@ -11,9 +11,19 @@ export async function login(formData: FormData) {
       redirectTo: "/",
     });
   } catch (error) {
+    // Re-throw Next.js redirect errors so the redirect actually happens
+    if (
+      error &&
+      typeof error === "object" &&
+      "digest" in error &&
+      typeof (error as { digest: unknown }).digest === "string" &&
+      (error as { digest: string }).digest.startsWith("NEXT_REDIRECT")
+    ) {
+      throw error;
+    }
     if (error instanceof AuthError) {
       return { error: "Invalid email or password" };
     }
-    throw error;
+    return { error: "Something went wrong" };
   }
 }
