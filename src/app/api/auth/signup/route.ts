@@ -10,36 +10,44 @@ const signupSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const parsed = signupSchema.safeParse(body);
+  try {
+    const body = await request.json();
+    const parsed = signupSchema.safeParse(body);
 
-  if (!parsed.success) {
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+
+    const existing = await prisma.user.findUnique({
+      where: { email: parsed.data.email },
+    });
+
+    if (existing) {
+      return NextResponse.json(
+        { error: { email: ["An account with this email already exists"] } },
+        { status: 409 }
+      );
+    }
+
+    const hashedPassword = await bcrypt.hash(parsed.data.password, 12);
+
+    await prisma.user.create({
+      data: {
+        name: parsed.data.name,
+        email: parsed.data.email,
+        password: hashedPassword,
+      },
+    });
+
+    return NextResponse.json({ success: true }, { status: 201 });
+  } catch (error) {
+    console.error("Signup error:", error);
     return NextResponse.json(
-      { error: parsed.error.flatten().fieldErrors },
-      { status: 400 }
+      { error: { email: ["Something went wrong. Please try again."] } },
+      { status: 500 }
     );
   }
-
-  const existing = await prisma.user.findUnique({
-    where: { email: parsed.data.email },
-  });
-
-  if (existing) {
-    return NextResponse.json(
-      { error: { email: ["An account with this email already exists"] } },
-      { status: 409 }
-    );
-  }
-
-  const hashedPassword = await bcrypt.hash(parsed.data.password, 12);
-
-  await prisma.user.create({
-    data: {
-      name: parsed.data.name,
-      email: parsed.data.email,
-      password: hashedPassword,
-    },
-  });
-
-  return NextResponse.json({ success: true }, { status: 201 });
 }

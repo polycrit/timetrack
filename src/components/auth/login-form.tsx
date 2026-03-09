@@ -19,21 +19,26 @@ export function LoginForm() {
     setLoading(true);
     const formData = new FormData(e.currentTarget);
 
-    const result = await signIn("credentials", {
-      email: formData.get("email") as string,
-      password: formData.get("password") as string,
-      redirect: false,
-    });
+    try {
+      const result = await signIn("credentials", {
+        email: formData.get("email") as string,
+        password: formData.get("password") as string,
+        redirect: false,
+      });
 
-    setLoading(false);
+      setLoading(false);
 
-    if (result?.error) {
+      if (!result?.ok) {
+        toast.error("Invalid email or password");
+        return;
+      }
+
+      router.push("/");
+      router.refresh();
+    } catch {
+      setLoading(false);
       toast.error("Invalid email or password");
-      return;
     }
-
-    router.push("/");
-    router.refresh();
   }
 
   async function handleGoogle() {
