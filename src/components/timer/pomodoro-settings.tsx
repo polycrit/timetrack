@@ -11,7 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Settings2 } from "lucide-react";
-import type { PomodoroSettings } from "@/lib/hooks/use-pomodoro-settings";
+import type { PomodoroSettings } from "@/lib/stores/timer-store";
 
 interface PomodoroSettingsDialogProps {
   settings: PomodoroSettings;

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useCountdown } from "@/lib/hooks/use-countdown";
+import { useTimerStore } from "@/lib/stores/timer-store";
+import { useHydrateStore, useCountdownTick } from "@/lib/hooks/use-timer-tick";
 import { formatCountdownDisplay } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -98,19 +99,39 @@ function ProgressRing({
 }
 
 export function CountdownTimer() {
-  const countdown = useCountdown();
+  useHydrateStore();
+  useCountdownTick();
+
+  const cdIsRunning = useTimerStore((s) => s.countdown.isRunning);
+  const cdIsPaused = useTimerStore((s) => s.countdown.isPaused);
+  const cdIsComplete = useTimerStore((s) => s.countdown.isComplete);
+  const cdTargetSeconds = useTimerStore((s) => s.countdown.targetSeconds);
+  const cdElapsed = useTimerStore((s) => s.countdownElapsed);
+
+  const countdownStart = useTimerStore((s) => s.countdownStart);
+  const countdownPause = useTimerStore((s) => s.countdownPause);
+  const countdownResume = useTimerStore((s) => s.countdownResume);
+  const countdownReset = useTimerStore((s) => s.countdownReset);
+  const countdownSetDuration = useTimerStore((s) => s.countdownSetDuration);
+
   const [customMinutes, setCustomMinutes] = useState("");
   const tickRef = useRef<HTMLParagraphElement>(null);
-  const prevSecondsRef = useRef(countdown.remainingSeconds);
+
+  const remainingSeconds = (cdIsRunning || cdIsComplete)
+    ? Math.max(0, cdTargetSeconds - cdElapsed)
+    : cdTargetSeconds;
+  const progress = cdTargetSeconds > 0 ? Math.min(1, cdElapsed / cdTargetSeconds) : 0;
+
+  const prevSecondsRef = useRef(remainingSeconds);
 
   // Digit tick animation on each second change
   useEffect(() => {
     if (
-      countdown.isRunning &&
-      !countdown.isPaused &&
-      countdown.remainingSeconds !== prevSecondsRef.current
+      cdIsRunning &&
+      !cdIsPaused &&
+      remainingSeconds !== prevSecondsRef.current
     ) {
-      prevSecondsRef.current = countdown.remainingSeconds;
+      prevSecondsRef.current = remainingSeconds;
       const el = tickRef.current;
       if (el) {
         el.classList.remove("animate-digit-tick");
@@ -118,31 +139,31 @@ export function CountdownTimer() {
         el.classList.add("animate-digit-tick");
       }
     }
-  }, [countdown.remainingSeconds, countdown.isRunning, countdown.isPaused]);
+  }, [remainingSeconds, cdIsRunning, cdIsPaused]);
 
   function handleCustomSet() {
     const mins = parseInt(customMinutes, 10);
     if (mins > 0) {
-      countdown.setDuration(mins * 60);
+      countdownSetDuration(mins * 60);
       setCustomMinutes("");
     }
   }
 
-  const timeColor = countdown.isComplete
+  const timeColor = cdIsComplete
     ? "text-accent animate-glow-pulse"
-    : countdown.isPaused
+    : cdIsPaused
       ? "text-muted-foreground animate-pulse"
-      : countdown.isRunning
+      : cdIsRunning
         ? "text-accent"
         : "text-foreground/70";
 
   let statusText: string;
-  if (countdown.isComplete) statusText = "// COMPLETE";
-  else if (countdown.isPaused) statusText = "// PAUSED";
-  else if (countdown.isRunning) statusText = "// COUNTING DOWN";
+  if (cdIsComplete) statusText = "// COMPLETE";
+  else if (cdIsPaused) statusText = "// PAUSED";
+  else if (cdIsRunning) statusText = "// COUNTING DOWN";
   else statusText = "// SET TIMER";
 
-  const showPicker = !countdown.isRunning && !countdown.isComplete;
+  const showPicker = !cdIsRunning && !cdIsComplete;
 
   return (
     <Card className="retro-bevel animate-card-appear">
@@ -155,12 +176,12 @@ export function CountdownTimer() {
                 <Button
                   key={p.label}
                   variant={
-                    countdown.totalDurationSeconds === p.seconds
+                    cdTargetSeconds === p.seconds
                       ? "secondary"
                       : "outline"
                   }
                   size="sm"
-                  onClick={() => countdown.setDuration(p.seconds)}
+                  onClick={() => countdownSetDuration(p.seconds)}
                 >
                   {p.label}
                 </Button>
@@ -188,16 +209,16 @@ export function CountdownTimer() {
         {/* Progress ring + digits */}
         <div className="flex justify-center">
           <ProgressRing
-            progress={countdown.progress}
-            isRunning={countdown.isRunning}
-            isPaused={countdown.isPaused}
-            isComplete={countdown.isComplete}
+            progress={progress}
+            isRunning={cdIsRunning}
+            isPaused={cdIsPaused}
+            isComplete={cdIsComplete}
           >
             <p
               ref={tickRef}
               className={`font-pixel text-2xl sm:text-3xl tabular-nums tracking-wider ${timeColor}`}
             >
-              {formatCountdownDisplay(countdown.remainingSeconds)}
+              {formatCountdownDisplay(remainingSeconds)}
             </p>
           </ProgressRing>
         </div>
@@ -209,18 +230,18 @@ export function CountdownTimer() {
 
         {/* Controls */}
         <div className="flex gap-3 justify-center">
-          {!countdown.isRunning && !countdown.isComplete ? (
+          {!cdIsRunning && !cdIsComplete ? (
             <Button
-              onClick={() => countdown.start()}
+              onClick={() => countdownStart()}
               size="lg"
               className="retro-bevel"
             >
               <Play className="mr-2 h-4 w-4" />
               Start
             </Button>
-          ) : countdown.isComplete ? (
+          ) : cdIsComplete ? (
             <Button
-              onClick={countdown.reset}
+              onClick={countdownReset}
               size="lg"
               className="retro-bevel"
             >
@@ -229,19 +250,19 @@ export function CountdownTimer() {
             </Button>
           ) : (
             <>
-              {countdown.isPaused ? (
-                <Button onClick={countdown.resume} size="lg" variant="outline">
+              {cdIsPaused ? (
+                <Button onClick={countdownResume} size="lg" variant="outline">
                   <Play className="mr-2 h-4 w-4" />
                   Resume
                 </Button>
               ) : (
-                <Button onClick={countdown.pause} size="lg" variant="outline">
+                <Button onClick={countdownPause} size="lg" variant="outline">
                   <Pause className="mr-2 h-4 w-4" />
                   Pause
                 </Button>
               )}
               <Button
-                onClick={countdown.reset}
+                onClick={countdownReset}
                 size="lg"
                 variant="destructive"
               >

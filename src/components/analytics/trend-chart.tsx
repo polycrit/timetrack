@@ -39,7 +39,7 @@ export function TrendChart({ data }: TrendChartProps) {
         <XAxis dataKey="date" tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} />
         <YAxis unit="h" tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} />
         <Tooltip
-          formatter={(value?: number) => value != null ? [`${value.toFixed(1)}h`, "Hours"] : ["0h", "Hours"]}
+          formatter={(value) => value != null ? [`${Number(value).toFixed(1)}h`, "Hours"] : ["0h", "Hours"]}
           contentStyle={TOOLTIP_STYLE}
         />
         <Line

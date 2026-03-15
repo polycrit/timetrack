@@ -2,9 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useTimer } from "@/lib/hooks/use-timer";
-import { useCountdown } from "@/lib/hooks/use-countdown";
-import { usePomodoroSettings } from "@/lib/hooks/use-pomodoro-settings";
+import { useTimerStore } from "@/lib/stores/timer-store";
+import { useHydrateStore, useTimerTick, useCountdownTick } from "@/lib/hooks/use-timer-tick";
 import { formatCountdownDisplay } from "@/lib/utils";
 import { TimerDisplay } from "./timer-display";
 import { ProgressRing } from "./progress-ring";
@@ -36,60 +35,109 @@ interface Project {
 
 export function Timer({ projects: initialProjects }: { projects: Project[] }) {
   const router = useRouter();
-  const { settings, updateSettings } = usePomodoroSettings();
-  const timer = useTimer(settings);
-  const countdown = useCountdown();
+  const hydrated = useHydrateStore();
+  useTimerTick();
+  useCountdownTick();
 
+  // --- Timer selectors ---
+  const timerIsRunning = useTimerStore((s) => s.timer.isRunning);
+  const timerIsPaused = useTimerStore((s) => s.timer.isPaused);
+  const timerMode = useTimerStore((s) => s.timer.mode);
+  const timerDescription = useTimerStore((s) => s.timer.description);
+  const timerProjectId = useTimerStore((s) => s.timer.projectId);
+  const timerPomodoroPhase = useTimerStore((s) => s.timer.pomodoroPhase);
+  const timerPomodoroCount = useTimerStore((s) => s.timer.pomodoroCount);
+  const timerPomodoroTargetSeconds = useTimerStore((s) => s.timer.pomodoroTargetSeconds);
+  const timerElapsed = useTimerStore((s) => s.timerElapsed);
+
+  // --- Countdown selectors ---
+  const cdIsRunning = useTimerStore((s) => s.countdown.isRunning);
+  const cdIsPaused = useTimerStore((s) => s.countdown.isPaused);
+  const cdIsComplete = useTimerStore((s) => s.countdown.isComplete);
+  const cdTargetSeconds = useTimerStore((s) => s.countdown.targetSeconds);
+  const cdDescription = useTimerStore((s) => s.countdown.description);
+  const cdProjectId = useTimerStore((s) => s.countdown.projectId);
+  const cdElapsed = useTimerStore((s) => s.countdownElapsed);
+
+  // --- Settings ---
+  const pomodoroSettings = useTimerStore((s) => s.pomodoroSettings);
+
+  // --- Actions ---
+  const timerStart = useTimerStore((s) => s.timerStart);
+  const timerPause = useTimerStore((s) => s.timerPause);
+  const timerResume = useTimerStore((s) => s.timerResume);
+  const timerStop = useTimerStore((s) => s.timerStop);
+  const timerSetDescription = useTimerStore((s) => s.timerSetDescription);
+  const timerSetProjectId = useTimerStore((s) => s.timerSetProjectId);
+  const timerSetMode = useTimerStore((s) => s.timerSetMode);
+  const timerSkipPhase = useTimerStore((s) => s.timerSkipPhase);
+
+  const countdownStart = useTimerStore((s) => s.countdownStart);
+  const countdownPause = useTimerStore((s) => s.countdownPause);
+  const countdownResume = useTimerStore((s) => s.countdownResume);
+  const countdownReset = useTimerStore((s) => s.countdownReset);
+  const countdownSetDuration = useTimerStore((s) => s.countdownSetDuration);
+  const countdownSetDescription = useTimerStore((s) => s.countdownSetDescription);
+  const countdownSetProjectId = useTimerStore((s) => s.countdownSetProjectId);
+
+  const updatePomodoroSettings = useTimerStore((s) => s.updatePomodoroSettings);
+
+  // --- Local UI state ---
   const [activeTab, setActiveTab] = useState<ActiveTab>("free");
-  const [hydrated, setHydrated] = useState(false);
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [localDescription, setLocalDescription] = useState("");
   const [localProjectId, setLocalProjectId] = useState<string>("");
-  const [countdownDescription, setCountdownDescription] = useState("");
-  const [countdownProjectId, setCountdownProjectId] = useState<string>("");
+  const [localCdDescription, setLocalCdDescription] = useState("");
+  const [localCdProjectId, setLocalCdProjectId] = useState<string>("");
   const [customMinutes, setCustomMinutes] = useState("");
 
   const countdownTickRef = useRef<HTMLParagraphElement>(null);
-  const prevCountdownSecondsRef = useRef(countdown.remainingSeconds);
 
-  // Hydrate: sync active tab from persisted state
-  useEffect(() => { setHydrated(true); }, []);
+  // Derived
+  const cdRemainingSeconds = (cdIsRunning || cdIsComplete)
+    ? Math.max(0, cdTargetSeconds - cdElapsed)
+    : cdTargetSeconds;
+  const cdProgress = cdTargetSeconds > 0 ? Math.min(1, cdElapsed / cdTargetSeconds) : 0;
+  const timerRemainingSeconds = timerMode === "pomodoro"
+    ? Math.max(0, timerPomodoroTargetSeconds - timerElapsed)
+    : 0;
+
+  const prevCdSecondsRef = useRef(cdRemainingSeconds);
+
+  // Sync active tab from persisted state on hydration
   useEffect(() => {
     if (!hydrated) return;
-    if (countdown.isRunning || countdown.isComplete) {
+    if (cdIsRunning || cdIsComplete) {
       setActiveTab("countdown");
     } else {
-      setActiveTab(timer.mode);
+      setActiveTab(timerMode);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated]);
 
+  // Sync local description/project from persisted timer state
   useEffect(() => {
-    setLocalDescription(timer.description);
-    setLocalProjectId(timer.projectId ?? "");
-  }, [timer.description, timer.projectId]);
+    setLocalDescription(timerDescription);
+    setLocalProjectId(timerProjectId ?? "");
+  }, [timerDescription, timerProjectId]);
 
   useEffect(() => {
     setProjects(initialProjects);
   }, [initialProjects]);
 
-  // Refresh dashboard when countdown completes (entry was saved)
-  const prevCountdownCompleteRef = useRef(false);
+  // Refresh dashboard when countdown completes
+  const prevCdCompleteRef = useRef(false);
   useEffect(() => {
-    if (countdown.isComplete && !prevCountdownCompleteRef.current) {
+    if (cdIsComplete && !prevCdCompleteRef.current) {
       router.refresh();
     }
-    prevCountdownCompleteRef.current = countdown.isComplete;
-  }, [countdown.isComplete, router]);
+    prevCdCompleteRef.current = cdIsComplete;
+  }, [cdIsComplete, router]);
 
   // Countdown digit tick animation
   useEffect(() => {
-    if (
-      countdown.isRunning &&
-      !countdown.isPaused &&
-      countdown.remainingSeconds !== prevCountdownSecondsRef.current
-    ) {
-      prevCountdownSecondsRef.current = countdown.remainingSeconds;
+    if (cdIsRunning && !cdIsPaused && cdRemainingSeconds !== prevCdSecondsRef.current) {
+      prevCdSecondsRef.current = cdRemainingSeconds;
       const el = countdownTickRef.current;
       if (el) {
         el.classList.remove("animate-digit-tick");
@@ -97,22 +145,22 @@ export function Timer({ projects: initialProjects }: { projects: Project[] }) {
         el.classList.add("animate-digit-tick");
       }
     }
-  }, [countdown.remainingSeconds, countdown.isRunning, countdown.isPaused]);
+  }, [cdRemainingSeconds, cdIsRunning, cdIsPaused]);
 
   function handleTabChange(value: string) {
     const tab = value as ActiveTab;
     setActiveTab(tab);
     if (tab === "free" || tab === "pomodoro") {
-      timer.setMode(tab);
+      timerSetMode(tab);
     }
   }
 
   function handleStart() {
-    timer.start(localProjectId || null, localDescription);
+    timerStart(localProjectId || null, localDescription);
   }
 
-  async function handleStop() {
-    const result = await timer.stop();
+  function handleStop() {
+    const result = timerStop();
     if (result) {
       setLocalDescription("");
       setLocalProjectId("");
@@ -121,50 +169,48 @@ export function Timer({ projects: initialProjects }: { projects: Project[] }) {
   }
 
   function handleSkip() {
-    timer.skipPhase();
+    timerSkipPhase();
     router.refresh();
   }
 
   function handleCountdownReset() {
-    countdown.reset();
-    setCountdownDescription("");
-    setCountdownProjectId("");
+    countdownReset();
+    setLocalCdDescription("");
+    setLocalCdProjectId("");
   }
 
   function handleCustomSet() {
     const mins = parseInt(customMinutes, 10);
     if (mins > 0) {
-      countdown.setDuration(mins * 60);
+      countdownSetDuration(mins * 60);
       setCustomMinutes("");
     }
   }
 
   const isBreak =
-    timer.mode === "pomodoro" &&
-    (timer.pomodoroPhase === "shortBreak" || timer.pomodoroPhase === "longBreak");
+    timerMode === "pomodoro" &&
+    (timerPomodoroPhase === "shortBreak" || timerPomodoroPhase === "longBreak");
 
   const isCountdownMode = activeTab === "countdown";
-  const isAnyRunning = timer.isRunning || countdown.isRunning || countdown.isComplete;
+  const isAnyRunning = timerIsRunning || cdIsRunning || cdIsComplete;
 
-  // Countdown visuals (on dark LED display)
-  const countdownTimeColor = countdown.isComplete
+  // Countdown visuals
+  const countdownTimeColor = cdIsComplete
     ? "text-[#FF8C42] animate-glow-pulse led-glow"
-    : countdown.isPaused
+    : cdIsPaused
       ? "text-[#A89070] animate-pulse"
-      : countdown.isRunning
+      : cdIsRunning
         ? "text-[#FF8C42] led-glow"
         : "text-[#F5E6D0]/70";
 
   let countdownStatusText: string;
-  if (countdown.isComplete) countdownStatusText = "// COMPLETE";
-  else if (countdown.isPaused) countdownStatusText = "// PAUSED";
-  else if (countdown.isRunning) countdownStatusText = "// COUNTING DOWN";
+  if (cdIsComplete) countdownStatusText = "// COMPLETE";
+  else if (cdIsPaused) countdownStatusText = "// PAUSED";
+  else if (cdIsRunning) countdownStatusText = "// COUNTING DOWN";
   else countdownStatusText = "// SET TIMER";
 
-  const showCountdownPicker = !countdown.isRunning && !countdown.isComplete;
-  const showInputs = isCountdownMode
-    ? !countdown.isComplete
-    : !isBreak;
+  const showCountdownPicker = !cdIsRunning && !cdIsComplete;
+  const showInputs = isCountdownMode ? !cdIsComplete : !isBreak;
 
   return (
     <Card className="retro-bevel animate-card-appear">
@@ -188,8 +234,8 @@ export function Timer({ projects: initialProjects }: { projects: Project[] }) {
             {activeTab === "pomodoro" && (
               <div className="absolute left-full top-1/2 -translate-y-1/2 ml-1.5">
                 <PomodoroSettingsDialog
-                  settings={settings}
-                  onUpdate={updateSettings}
+                  settings={pomodoroSettings}
+                  onUpdate={updatePomodoroSettings}
                 />
               </div>
             )}
@@ -207,12 +253,12 @@ export function Timer({ projects: initialProjects }: { projects: Project[] }) {
                       <Button
                         key={p.label}
                         variant={
-                          countdown.totalDurationSeconds === p.seconds
+                          cdTargetSeconds === p.seconds
                             ? "secondary"
                             : "outline"
                         }
                         size="sm"
-                        onClick={() => countdown.setDuration(p.seconds)}
+                        onClick={() => countdownSetDuration(p.seconds)}
                       >
                         {p.label}
                       </Button>
@@ -238,16 +284,16 @@ export function Timer({ projects: initialProjects }: { projects: Project[] }) {
               )}
 
               <ProgressRing
-                progress={countdown.progress}
-                isRunning={countdown.isRunning}
-                isPaused={countdown.isPaused}
-                isComplete={countdown.isComplete}
+                progress={cdProgress}
+                isRunning={cdIsRunning}
+                isPaused={cdIsPaused}
+                isComplete={cdIsComplete}
               >
                 <p
                   ref={countdownTickRef}
                   className={`font-pixel text-2xl sm:text-3xl tabular-nums tracking-wider ${countdownTimeColor}`}
                 >
-                  {formatCountdownDisplay(countdown.remainingSeconds)}
+                  {formatCountdownDisplay(cdRemainingSeconds)}
                 </p>
               </ProgressRing>
 
@@ -257,32 +303,32 @@ export function Timer({ projects: initialProjects }: { projects: Project[] }) {
             </>
           ) : (
             <TimerDisplay
-              seconds={timer.elapsedSeconds}
-              remainingSeconds={timer.remainingSeconds}
-              targetSeconds={timer.pomodoroTargetSeconds}
-              isRunning={timer.isRunning}
-              isPaused={timer.isPaused}
-              mode={timer.mode}
-              pomodoroPhase={timer.pomodoroPhase}
-              pomodoroCount={timer.pomodoroCount}
-              cyclesBeforeLongBreak={settings.cyclesBeforeLongBreak}
+              seconds={timerElapsed}
+              remainingSeconds={timerRemainingSeconds}
+              targetSeconds={timerPomodoroTargetSeconds}
+              isRunning={timerIsRunning}
+              isPaused={timerIsPaused}
+              mode={timerMode}
+              pomodoroPhase={timerPomodoroPhase}
+              pomodoroCount={timerPomodoroCount}
+              cyclesBeforeLongBreak={pomodoroSettings.cyclesBeforeLongBreak}
             />
           )}
         </div>
 
-        {/* Controls — directly under the timer display */}
+        {/* Controls */}
         <div className="flex gap-3 justify-center">
           {isCountdownMode ? (
             <>
-              {!countdown.isRunning && !countdown.isComplete ? (
+              {!cdIsRunning && !cdIsComplete ? (
                 <Button
-                  onClick={() => countdown.start(countdownProjectId || null, countdownDescription)}
+                  onClick={() => countdownStart(localCdProjectId || null, localCdDescription)}
                   size="lg"
                 >
                   <Play className="mr-2 h-4 w-4" />
                   Start
                 </Button>
-              ) : countdown.isComplete ? (
+              ) : cdIsComplete ? (
                 <Button
                   onClick={handleCountdownReset}
                   size="lg"
@@ -292,13 +338,13 @@ export function Timer({ projects: initialProjects }: { projects: Project[] }) {
                 </Button>
               ) : (
                 <>
-                  {countdown.isPaused ? (
-                    <Button onClick={countdown.resume} size="lg" variant="outline">
+                  {cdIsPaused ? (
+                    <Button onClick={countdownResume} size="lg" variant="outline">
                       <Play className="mr-2 h-4 w-4" />
                       Resume
                     </Button>
                   ) : (
-                    <Button onClick={countdown.pause} size="lg" variant="outline">
+                    <Button onClick={countdownPause} size="lg" variant="outline">
                       <Pause className="mr-2 h-4 w-4" />
                       Pause
                     </Button>
@@ -316,25 +362,25 @@ export function Timer({ projects: initialProjects }: { projects: Project[] }) {
             </>
           ) : (
             <>
-              {!timer.isRunning ? (
+              {!timerIsRunning ? (
                 <Button onClick={handleStart} size="lg">
                   <Play className="mr-2 h-4 w-4" />
                   Start
                 </Button>
               ) : (
                 <>
-                  {timer.isPaused ? (
-                    <Button onClick={timer.resume} size="lg" variant="outline">
+                  {timerIsPaused ? (
+                    <Button onClick={timerResume} size="lg" variant="outline">
                       <Play className="mr-2 h-4 w-4" />
                       Resume
                     </Button>
                   ) : (
-                    <Button onClick={timer.pause} size="lg" variant="outline">
+                    <Button onClick={timerPause} size="lg" variant="outline">
                       <Pause className="mr-2 h-4 w-4" />
                       Pause
                     </Button>
                   )}
-                  {timer.mode === "pomodoro" && (
+                  {timerMode === "pomodoro" && (
                     <Button onClick={handleSkip} size="lg" variant="secondary">
                       <SkipForward className="mr-2 h-4 w-4" />
                       Skip
@@ -357,19 +403,19 @@ export function Timer({ projects: initialProjects }: { projects: Project[] }) {
               placeholder="What are you working on?"
               value={
                 isCountdownMode
-                  ? countdown.isRunning ? countdown.description : countdownDescription
-                  : timer.isRunning ? timer.description : localDescription
+                  ? cdIsRunning ? cdDescription : localCdDescription
+                  : timerIsRunning ? timerDescription : localDescription
               }
               onChange={(e) => {
                 if (isCountdownMode) {
-                  if (countdown.isRunning) {
-                    countdown.setDescription(e.target.value);
+                  if (cdIsRunning) {
+                    countdownSetDescription(e.target.value);
                   } else {
-                    setCountdownDescription(e.target.value);
+                    setLocalCdDescription(e.target.value);
                   }
                 } else {
-                  if (timer.isRunning) {
-                    timer.setDescription(e.target.value);
+                  if (timerIsRunning) {
+                    timerSetDescription(e.target.value);
                   } else {
                     setLocalDescription(e.target.value);
                   }
@@ -381,20 +427,20 @@ export function Timer({ projects: initialProjects }: { projects: Project[] }) {
               projects={projects}
               value={
                 isCountdownMode
-                  ? countdown.isRunning ? (countdown.projectId ?? "") : countdownProjectId
-                  : timer.isRunning ? (timer.projectId ?? "") : localProjectId
+                  ? cdIsRunning ? (cdProjectId ?? "") : localCdProjectId
+                  : timerIsRunning ? (timerProjectId ?? "") : localProjectId
               }
               onValueChange={(val) => {
                 const id = val === "none" ? "" : val;
                 if (isCountdownMode) {
-                  if (countdown.isRunning) {
-                    countdown.setProjectId(id || null);
+                  if (cdIsRunning) {
+                    countdownSetProjectId(id || null);
                   } else {
-                    setCountdownProjectId(id);
+                    setLocalCdProjectId(id);
                   }
                 } else {
-                  if (timer.isRunning) {
-                    timer.setProjectId(id || null);
+                  if (timerIsRunning) {
+                    timerSetProjectId(id || null);
                   } else {
                     setLocalProjectId(id);
                   }

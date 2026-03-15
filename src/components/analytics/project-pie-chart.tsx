@@ -87,7 +87,7 @@ export function ProjectPieChart({ data }: ProjectPieChartProps) {
             ))}
           </Pie>
           <Tooltip
-            formatter={(value?: number) => value != null ? [`${value.toFixed(1)}h`, "Hours"] : ["0h", "Hours"]}
+            formatter={(value) => value != null ? [`${Number(value).toFixed(1)}h`, "Hours"] : ["0h", "Hours"]}
             contentStyle={TOOLTIP_STYLE}
           />
           <Legend

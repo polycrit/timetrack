@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { formatTimerDisplay, formatCountdown } from "@/lib/utils";
 import { ProgressRing } from "./progress-ring";
-import type { TimerMode, PomodoroPhase } from "@/lib/hooks/use-timer";
+import type { TimerMode, PomodoroPhase } from "@/lib/stores/timer-store";
 
 interface TimerDisplayProps {
   seconds: number;

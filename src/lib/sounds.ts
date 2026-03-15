@@ -74,3 +74,21 @@ export function playTimerStop() {
   const t = ctx.currentTime;
   playTone(660, t, 0.12, ctx, "sine", 0.08);
 }
+
+/** Soft descending tone — paused */
+export function playPause() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  playTone(520, t, 0.08, ctx, "sine", 0.07);
+  playTone(440, t + 0.08, 0.12, ctx, "sine", 0.07);
+}
+
+/** Soft ascending tone — resumed */
+export function playResume() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  playTone(440, t, 0.08, ctx, "sine", 0.07);
+  playTone(520, t + 0.08, 0.12, ctx, "sine", 0.07);
+}
