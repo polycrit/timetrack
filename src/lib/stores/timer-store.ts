@@ -230,11 +230,9 @@ export const useTimerStore = create<TimerStore>()(
         const { timer, pomodoroSettings } = get();
         if (!timer.startTime) return null;
 
-        const endTime = Date.now();
-        let totalPaused = timer.pausedDuration;
-        if (timer.isPaused && timer.pauseStart) {
-          totalPaused += endTime - timer.pauseStart;
-        }
+        const endTime =
+          timer.isPaused && timer.pauseStart ? timer.pauseStart : Date.now();
+        const totalPaused = timer.pausedDuration;
         const durationMs = endTime - timer.startTime - totalPaused;
         const durationSeconds = Math.round(durationMs / 1000);
 
