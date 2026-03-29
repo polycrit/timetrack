@@ -7,8 +7,12 @@ export const proxy = auth((req) => {
     nextUrl.pathname.startsWith("/login") ||
     nextUrl.pathname.startsWith("/signup");
   const isAuthApi = nextUrl.pathname.startsWith("/api/auth");
+  const isVerificationPage =
+    nextUrl.pathname.startsWith("/verify-email") ||
+    nextUrl.pathname.startsWith("/check-email");
 
   if (isAuthApi) return;
+  if (isVerificationPage) return;
 
   if (isAuthPage) {
     if (isLoggedIn) {

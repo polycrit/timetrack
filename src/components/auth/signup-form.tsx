@@ -49,27 +49,18 @@ export function SignupForm() {
 
     // Auto sign-in after signup
     try {
-      const result = await signIn("credentials", {
+      await signIn("credentials", {
         email,
         password,
         redirect: false,
       });
-
-      setLoading(false);
-
-      if (!result?.ok) {
-        toast.error("Account created but sign-in failed. Please sign in manually.");
-        router.push("/login");
-        return;
-      }
-
-      router.push("/");
-      router.refresh();
     } catch {
-      setLoading(false);
-      toast.error("Account created but sign-in failed. Please sign in manually.");
-      router.push("/login");
+      // Sign-in failure is non-critical — user can log in later
     }
+
+    setLoading(false);
+    router.push(`/check-email?email=${encodeURIComponent(email)}`);
+    router.refresh();
   }
 
   return (

@@ -2,6 +2,9 @@
 
 import { signIn } from "@/lib/auth";
 import { AuthError } from "next-auth";
+import { prisma } from "@/lib/prisma";
+import { generateVerificationToken } from "@/lib/verification-token";
+import { sendVerificationEmail } from "@/lib/email";
 
 export async function login(formData: FormData) {
   try {
@@ -25,5 +28,20 @@ export async function login(formData: FormData) {
       return { error: "Invalid email or password" };
     }
     return { error: "Something went wrong" };
+  }
+}
+
+export async function resendVerificationEmail(email: string) {
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user || user.emailVerified) {
+    return { error: "Invalid request" };
+  }
+
+  try {
+    const token = await generateVerificationToken(email);
+    await sendVerificationEmail(email, token);
+    return { success: true };
+  } catch {
+    return { error: "Failed to send email. Please try again." };
   }
 }

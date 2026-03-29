@@ -52,7 +52,7 @@ export function EntryFilters({
   return (
     <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-start sm:items-end">
       <div className="space-y-1 w-full sm:w-auto">
-        <label className="text-sm text-muted-foreground">From</label>
+        <label className="block text-sm text-muted-foreground">From</label>
         <Input
           type="date"
           value={searchParams.get("startDate") ?? ""}
@@ -61,7 +61,7 @@ export function EntryFilters({
         />
       </div>
       <div className="space-y-1 w-full sm:w-auto">
-        <label className="text-sm text-muted-foreground">To</label>
+        <label className="block text-sm text-muted-foreground">To</label>
         <Input
           type="date"
           value={searchParams.get("endDate") ?? ""}

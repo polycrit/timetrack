@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { generateVerificationToken } from "@/lib/verification-token";
+import { sendVerificationEmail } from "@/lib/email";
 import { z } from "zod";
 
 const signupSchema = z.object({
@@ -41,6 +43,13 @@ export async function POST(request: NextRequest) {
         password: hashedPassword,
       },
     });
+
+    try {
+      const token = await generateVerificationToken(parsed.data.email);
+      await sendVerificationEmail(parsed.data.email, token);
+    } catch (e) {
+      console.error("Failed to send verification email:", e);
+    }
 
     return NextResponse.json({ success: true }, { status: 201 });
   } catch (error) {
