@@ -203,9 +203,16 @@ export const useTimerStore = create<TimerStore>()(
       timerPause: () => {
         playPause();
         toast("Timer paused");
-        set((s) => ({
-          timer: { ...s.timer, isPaused: true, pauseStart: Date.now() },
-        }));
+        set((s) => {
+          const now = Date.now();
+          const elapsed = s.timer.startTime
+            ? Math.floor((now - s.timer.startTime - s.timer.pausedDuration) / 1000)
+            : 0;
+          return {
+            timer: { ...s.timer, isPaused: true, pauseStart: now },
+            timerElapsed: elapsed,
+          };
+        });
       },
 
       timerResume: () => {
@@ -234,7 +241,7 @@ export const useTimerStore = create<TimerStore>()(
           timer.isPaused && timer.pauseStart ? timer.pauseStart : Date.now();
         const totalPaused = timer.pausedDuration;
         const durationMs = endTime - timer.startTime - totalPaused;
-        const durationSeconds = Math.round(durationMs / 1000);
+        const durationSeconds = Math.floor(durationMs / 1000);
 
         playTimerStop();
         toast("Timer stopped", {
@@ -261,7 +268,7 @@ export const useTimerStore = create<TimerStore>()(
             body: JSON.stringify({
               description: timer.description,
               startTime: new Date(timer.startTime).toISOString(),
-              endTime: new Date(endTime).toISOString(),
+              endTime: new Date(timer.startTime + durationMs).toISOString(),
               projectId: timer.projectId || null,
               tagIds: [],
             }),
@@ -304,13 +311,14 @@ export const useTimerStore = create<TimerStore>()(
         if (timer.pomodoroPhase === "work") {
           // Save partial work entry
           if (timer.startTime) {
+            const activeDurationMs = Date.now() - timer.startTime - timer.pausedDuration;
             fetch("/api/entries", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 description: timer.description,
                 startTime: new Date(timer.startTime).toISOString(),
-                endTime: new Date().toISOString(),
+                endTime: new Date(timer.startTime + activeDurationMs).toISOString(),
                 projectId: timer.projectId || null,
                 tagIds: [],
               }),
@@ -388,13 +396,14 @@ export const useTimerStore = create<TimerStore>()(
           if (timer.pomodoroPhase === "work") {
             // Save work entry
             if (timer.startTime) {
+              const activeDurationMs = Date.now() - timer.startTime - timer.pausedDuration;
               fetch("/api/entries", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   description: timer.description,
                   startTime: new Date(timer.startTime).toISOString(),
-                  endTime: new Date().toISOString(),
+                  endTime: new Date(timer.startTime + activeDurationMs).toISOString(),
                   projectId: timer.projectId || null,
                   tagIds: [],
                 }),
@@ -493,9 +502,16 @@ export const useTimerStore = create<TimerStore>()(
       countdownPause: () => {
         playPause();
         toast("Countdown paused");
-        set((s) => ({
-          countdown: { ...s.countdown, isPaused: true, pauseStart: Date.now() },
-        }));
+        set((s) => {
+          const now = Date.now();
+          const elapsed = s.countdown.startTime
+            ? Math.floor((now - s.countdown.startTime - s.countdown.pausedDuration) / 1000)
+            : 0;
+          return {
+            countdown: { ...s.countdown, isPaused: true, pauseStart: now },
+            countdownElapsed: elapsed,
+          };
+        });
       },
 
       countdownResume: () => {
@@ -569,13 +585,14 @@ export const useTimerStore = create<TimerStore>()(
 
           // Save entry
           if (countdown.startTime) {
+            const activeDurationMs = Date.now() - countdown.startTime - countdown.pausedDuration;
             fetch("/api/entries", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 description: countdown.description,
                 startTime: new Date(countdown.startTime).toISOString(),
-                endTime: new Date().toISOString(),
+                endTime: new Date(countdown.startTime + activeDurationMs).toISOString(),
                 projectId: countdown.projectId || null,
                 tagIds: [],
               }),
@@ -645,6 +662,25 @@ export const useTimerStore = create<TimerStore>()(
         countdown: state.countdown,
         pomodoroSettings: state.pomodoroSettings,
       }),
+      merge: (persisted, current) => {
+        const merged = { ...current, ...(persisted as object) } as TimerStore;
+        // Recompute elapsed values for paused timers (not persisted)
+        const t = merged.timer;
+        if (t.isRunning && t.isPaused && t.startTime && t.pauseStart) {
+          merged.timerElapsed = Math.max(
+            0,
+            Math.floor((t.pauseStart - t.startTime - t.pausedDuration) / 1000),
+          );
+        }
+        const c = merged.countdown;
+        if (c.isRunning && c.isPaused && c.startTime && c.pauseStart) {
+          merged.countdownElapsed = Math.max(
+            0,
+            Math.floor((c.pauseStart - c.startTime - c.pausedDuration) / 1000),
+          );
+        }
+        return merged;
+      },
       // Migrate from legacy separate localStorage keys
       onRehydrateStorage: () => {
         return (state) => {

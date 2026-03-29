@@ -1,18 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { useTimerStore } from "@/lib/stores/timer-store";
 
 /** Hydrate the persisted store on mount (SSR-safe). */
 export function useHydrateStore() {
-  const [hydrated, setHydrated] = useState(false);
-
   useEffect(() => {
     useTimerStore.persist.rehydrate();
-    setHydrated(true);
   }, []);
 
-  return hydrated;
+  return useSyncExternalStore(
+    (cb) => useTimerStore.persist.onFinishHydration(cb),
+    () => useTimerStore.persist.hasHydrated(),
+    () => false,
+  );
 }
 
 /** Drive the timer's elapsed-seconds counter via setInterval. */
